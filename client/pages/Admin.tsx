@@ -14,10 +14,10 @@ export default function Admin() {
     localStorage.getItem("adminToken"),
   );
   const [email, setEmail] = useState<string>(
-    (import.meta as any).env.VITE_ADMIN_EMAIL || "karunasetu@gmail.com",
+    (import.meta as any).env.VITE_ADMIN_EMAIL
   );
   const [password, setPassword] = useState<string>(
-    (import.meta as any).env.VITE_ADMIN_PASSWORD || "NGOcraze@25",
+    (import.meta as any).env.VITE_ADMIN_PASSWORD
   );
 
   const [activeTab, setActiveTab] = useState<"images" | "donors" | "members">(
