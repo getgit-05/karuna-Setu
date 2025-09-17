@@ -17,7 +17,7 @@ const upload = multer({
 });
 
 function ensureUploadsDir() {
-  const uploadsDir = path.resolve(import.meta.dirname, "../../public/uploads");
+  const uploadsDir = path.resolve(__dirname, "../../public/uploads");
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   return uploadsDir;
 }
