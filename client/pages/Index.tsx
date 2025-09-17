@@ -621,7 +621,7 @@ function HeroSlideshow() {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     if (imgs.length <= 1) return;
-    const id = setInterval(() => setIdx((i) => (i + 1) % imgs.length), 2500);
+    const id = setInterval(() => setIdx((i) => (i + 1) % imgs.length), 6000);
     return () => clearInterval(id);
   }, [imgs.length]);
   const current =
