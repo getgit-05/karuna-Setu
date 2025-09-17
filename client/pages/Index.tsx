@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { Donor, GetDonorsResponse, GetGalleryResponse } from "@shared/api";
 import { Link } from "react-router-dom";
@@ -627,8 +628,19 @@ function HeroSlideshow() {
     imgs[idx]?.url ||
     "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=60";
   return (
-    <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-lg">
-      <img src={current} alt="Gallery" className="h-full w-full object-cover" />
+    <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-lg relative">
+      <AnimatePresence mode="wait">
+        <motion.img
+          key={current}
+          src={current}
+          alt="Gallery"
+          className="absolute inset-0 h-full w-full object-cover"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.6, ease: "easeInOut" }}
+        />
+      </AnimatePresence>
     </div>
   );
 }
