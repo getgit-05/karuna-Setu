@@ -20,7 +20,7 @@ export interface UploadImageResponse {
 export interface Member {
   _id?: string;
   name: string;
-  role: "Founder" | "Partner" | "Core";
+  role: "Founder" | "Co-Founder" | "Partner" | "Co-Partner" | "Core" | "Technical Team" | "Volunteer" | "Advisor";
   bio?: string;
   photoUrl?: string;
   instaId?: string;

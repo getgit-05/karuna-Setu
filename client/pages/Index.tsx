@@ -127,7 +127,7 @@ export default function Index() {
             </div>
           </div>
           <div className="relative">
-            <div className="aspect-[4/3] rounded-2xl bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=60')] bg-cover bg-center shadow-lg" />
+            <HeroSlideshow />
           </div>
         </div>
       </section>

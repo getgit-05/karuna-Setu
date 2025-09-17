@@ -18,8 +18,10 @@ export async function verifyAdminCredentials(email: string, password: string) {
 }
 
 // Create JWT token
+const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || "changeme";
+
 export function createAdminToken() {
-  return jwt.sign({ role: "admin" }, process.env.JWT_SECRET || "changeme", {
+  return jwt.sign({ role: "admin" }, ADMIN_JWT_SECRET, {
     expiresIn: "5h",
   });
 }
@@ -27,7 +29,7 @@ export function createAdminToken() {
 // Verify JWT token
 export function verifyAdminToken(token: string) {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || "changeme");
+    return jwt.verify(token, ADMIN_JWT_SECRET);
   } catch {
     return null;
   }

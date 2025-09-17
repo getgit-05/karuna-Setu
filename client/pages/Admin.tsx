@@ -81,6 +81,7 @@ export default function Admin() {
         body: fd,
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Upload failed");
       return (await res.json()) as { images: { title: string; url: string }[] };
     },
@@ -110,6 +111,7 @@ export default function Admin() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
@@ -138,6 +140,7 @@ export default function Admin() {
         body: fd,
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return (await res.json()) as CreateDonorResponse;
     },
@@ -157,6 +160,7 @@ export default function Admin() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
@@ -188,6 +192,7 @@ export default function Admin() {
         body: fd,
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
@@ -206,6 +211,7 @@ export default function Admin() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
@@ -483,8 +489,13 @@ export default function Admin() {
               />
               <select name="role" className="rounded-md border px-3 py-2">
                 <option>Founder</option>
+                <option>Co-Founder</option>
                 <option>Partner</option>
+                <option>Co-Partner</option>
                 <option>Core</option>
+                <option>Technical Team</option>
+                <option>Volunteer</option>
+                <option>Advisor</option>
               </select>
               <input
                 id="member-photo"

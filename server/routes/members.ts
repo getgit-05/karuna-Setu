@@ -64,24 +64,26 @@ router.post("/admin", requireAdminKey, upload.single("photo"), (async (
     return res.status(503).json({ error: "Database not configured" });
 
   let photoUrl: string | undefined;
+  let photoPublicId: string | undefined;
   const file = req.file;
   const cloudOk = configureCloudinary();
   try {
     if (file) {
       if (cloudOk) {
-        const uploaded = await new Promise<{ secure_url: string }>(
+        const uploaded = await new Promise<{ secure_url: string; public_id: string }>(
           (resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
               { folder: process.env.CLOUDINARY_FOLDER || "ngo-gallery" },
               (err, result) => {
                 if (err || !result) return reject(err);
-                resolve({ secure_url: result.secure_url });
+                resolve({ secure_url: result.secure_url, public_id: result.public_id });
               },
             );
             stream.end(file.buffer);
           },
         );
         photoUrl = uploaded.secure_url;
+        photoPublicId = uploaded.public_id;
       } else {
         const uploadsDir = ensureUploadsDir();
         const filename = `${Date.now()}-${file.originalname}`.replace(
@@ -98,6 +100,7 @@ router.post("/admin", requireAdminKey, upload.single("photo"), (async (
       role: (role as any) || "Core",
       bio,
       photoUrl,
+      photoPublicId,
       instaId,
       email,
       contact,
@@ -115,8 +118,26 @@ router.delete("/admin/:id", requireAdminKey, (async (req, res) => {
   const { connected } = await connectMongo();
   if (!connected)
     return res.status(503).json({ error: "Database not configured" });
-  await MemberModel.findByIdAndDelete(id);
-  res.json({ ok: true });
+
+  const member = await MemberModel.findById(id).lean();
+  if (!member) return res.status(404).json({ error: "Not found" });
+
+  try {
+    if ((member as any).photoPublicId) {
+      try { await cloudinary.uploader.destroy((member as any).photoPublicId); } catch {}
+    } else if (member.photoUrl && member.photoUrl.startsWith("/uploads/")) {
+      const uploadsRoot = path.resolve(__dirname, "../../public");
+      const rel = member.photoUrl.replace(/^\//, "");
+      const filePath = path.join(uploadsRoot, rel);
+      try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+    }
+
+    await MemberModel.findByIdAndDelete(id);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Failed to delete member" });
+  }
 }) as RequestHandler);
 
 export default router;
