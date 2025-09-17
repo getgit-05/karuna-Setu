@@ -262,13 +262,13 @@ export default function Index() {
                     ₹{amt}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {amt === 500
+                    {amt === 50
                       ? "Feeds a child for a month"
-                      : amt === 1000
+                      : amt === 500
                         ? "School supplies for 5 kids"
-                        : amt === 2500
+                        : amt === 1000
                           ? "Medical care for a family"
-                          : "Vocational training for 1 woman"}
+                          : "Vaccination for 1 street dog"}
                   </div>
                 </button>
               ))}

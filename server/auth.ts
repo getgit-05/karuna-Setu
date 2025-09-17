@@ -1,37 +1,34 @@
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "karunasetu@gmail.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "NGOcraze@25";
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || "dev-secret-change-me";
+// Hardcoded admin credentials (you can later move to DB)
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "password123";
+let passwordHash: string;
 
-// Hash the password once at startup
-let hashedPassword: string | null = null;
-
+// Initialize hash
 export async function initAdminHash() {
-  if (!hashedPassword) {
-    hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
-    console.log("Admin password hash generated");
-  }
+  passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
 }
 
+// Verify credentials
 export async function verifyAdminCredentials(email: string, password: string) {
   if (email !== ADMIN_EMAIL) return false;
-  if (!hashedPassword) await initAdminHash();
-  if (!hashedPassword) return false;
-  return bcrypt.compare(password, hashedPassword);
+  return bcrypt.compare(password, passwordHash);
 }
 
-export function createAdminToken(payload?: object) {
-  return jwt.sign({ email: ADMIN_EMAIL, ...(payload || {}) }, JWT_SECRET, {
-    expiresIn: "4h",
+// Create JWT token
+export function createAdminToken() {
+  return jwt.sign({ role: "admin" }, process.env.JWT_SECRET || "changeme", {
+    expiresIn: "5h",
   });
 }
 
+// Verify JWT token
 export function verifyAdminToken(token: string) {
   try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (e) {
+    return jwt.verify(token, process.env.JWT_SECRET || "changeme");
+  } catch {
     return null;
   }
 }
