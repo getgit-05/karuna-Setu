@@ -6,6 +6,7 @@ export interface ApiImage {
   id?: string;
   title: string;
   url: string;
+  featured?: boolean;
   createdAt: string | Date;
 }
 
@@ -20,7 +21,7 @@ export interface UploadImageResponse {
 export interface Member {
   _id?: string;
   name: string;
-  role: "Founder" | "Co-Founder" | "Partner" | "Co-Partner" | "Core" | "Technical Team" | "Volunteer" | "Advisor";
+  role: "Founder" | "Co-Founder" | "Partner" | "Co-Partner" | "Core" | "Technology" | "Developer" | "Volunteer" | "Advisor";
   bio?: string;
   photoUrl?: string;
   instaId?: string;

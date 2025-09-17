@@ -41,12 +41,33 @@ function configureCloudinary() {
 router.get("/", (async (_req, res) => {
   const { connected } = await connectMongo();
   if (!connected) {
-    return res.json({
-      images: [],
-    });
+    return res.json({ images: [] });
   }
   const images = await ImageModel.find().sort({ createdAt: -1 }).lean();
   res.json({ images });
+}) as RequestHandler);
+
+// GET /api/gallery/featured - only featured images
+router.get("/featured", (async (_req, res) => {
+  const { connected } = await connectMongo();
+  if (!connected) return res.json({ images: [] });
+  const images = await ImageModel.find({ featured: true })
+    .sort({ createdAt: -1 })
+    .lean();
+  res.json({ images });
+}) as RequestHandler);
+
+// PATCH /api/gallery/admin/:id - update image (e.g., featured)
+router.patch("/admin/:id", requireAdminKey, (async (req, res) => {
+  const id = req.params.id;
+  const { featured } = req.body as { featured?: boolean };
+  const { connected } = await connectMongo();
+  if (!connected) return res.status(503).json({ error: "Database not configured" });
+  const update: any = {};
+  if (typeof featured === "boolean") update.featured = featured;
+  const doc = await ImageModel.findByIdAndUpdate(id, update, { new: true }).lean();
+  if (!doc) return res.status(404).json({ error: "Not found" });
+  res.json({ image: doc });
 }) as RequestHandler);
 
 // POST /api/admin/gallery - upload multiple images

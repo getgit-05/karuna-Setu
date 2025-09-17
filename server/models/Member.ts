@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IMember extends Document {
   name: string;
-  role: "Founder" | "Co-Founder" | "Partner" | "Co-Partner" | "Core" | "Technical Team" | "Volunteer" | "Advisor";
+  role: "Founder" | "Co-Founder" | "Partner" | "Co-Partner" | "Core" | "Technology" | "Developer" | "Volunteer" | "Advisor";
   bio?: string;
   photoUrl?: string;
   instaId?: string;
@@ -22,7 +22,8 @@ const MemberSchema: Schema<IMember> = new Schema(
         "Partner",
         "Co-Partner",
         "Core",
-        "Technical Team",
+        "Technology",
+        "Developer",
         "Volunteer",
         "Advisor",
       ],
