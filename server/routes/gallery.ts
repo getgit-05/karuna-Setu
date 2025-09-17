@@ -2,8 +2,11 @@ import { RequestHandler, Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import { v2 as cloudinary } from "cloudinary";
 import { connectMongo } from "../db";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { ImageModel } from "../models/Image";
 import { requireAdminKey } from "../middleware/adminAuth";
 
@@ -38,12 +41,33 @@ function configureCloudinary() {
 router.get("/", (async (_req, res) => {
   const { connected } = await connectMongo();
   if (!connected) {
-    return res.json({
-      images: [],
-    });
+    return res.json({ images: [] });
   }
   const images = await ImageModel.find().sort({ createdAt: -1 }).lean();
   res.json({ images });
+}) as RequestHandler);
+
+// GET /api/gallery/featured - only featured images
+router.get("/featured", (async (_req, res) => {
+  const { connected } = await connectMongo();
+  if (!connected) return res.json({ images: [] });
+  const images = await ImageModel.find({ featured: true })
+    .sort({ createdAt: -1 })
+    .lean();
+  res.json({ images });
+}) as RequestHandler);
+
+// PATCH /api/gallery/admin/:id - update image (e.g., featured)
+router.patch("/admin/:id", requireAdminKey, (async (req, res) => {
+  const id = req.params.id;
+  const { featured } = req.body as { featured?: boolean };
+  const { connected } = await connectMongo();
+  if (!connected) return res.status(503).json({ error: "Database not configured" });
+  const update: any = {};
+  if (typeof featured === "boolean") update.featured = featured;
+  const doc = await ImageModel.findByIdAndUpdate(id, update, { new: true }).lean();
+  if (!doc) return res.status(404).json({ error: "Not found" });
+  res.json({ image: doc });
 }) as RequestHandler);
 
 // POST /api/admin/gallery - upload multiple images
@@ -133,7 +157,7 @@ router.delete("/admin/:id", requireAdminKey, (async (req, res) => {
         console.warn("Cloudinary delete failed", e);
       }
     } else if (img.url && (img.url as string).startsWith("/uploads/")) {
-      const uploadsRoot = path.resolve(import.meta.dirname, "../../public");
+      const uploadsRoot = path.resolve(__dirname, "../../public");
       const rel = (img.url as string).replace(/^\//, "");
       const filePath = path.join(uploadsRoot, rel);
       try {

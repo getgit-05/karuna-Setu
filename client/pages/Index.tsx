@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { Donor, GetDonorsResponse } from "@shared/api";
+import { Donor, GetDonorsResponse, GetGalleryResponse } from "@shared/api";
 import { Link } from "react-router-dom";
 import { apiGet } from "@/lib/api";
 
@@ -127,7 +128,7 @@ export default function Index() {
             </div>
           </div>
           <div className="relative">
-            <div className="aspect-[4/3] rounded-2xl bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=60')] bg-cover bg-center shadow-lg" />
+            <HeroSlideshow />
           </div>
         </div>
       </section>
@@ -232,6 +233,63 @@ export default function Index() {
               {m.bio && (
                 <div className="mt-2 text-sm text-muted-foreground">
                   {m.bio}
+                </div>
+              )}
+              {(m.instaId || m.email || m.contact) && (
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm">
+                  {m.instaId && (
+                    <a
+                      href={`https://instagram.com/${m.instaId.replace(/^@/, "")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-pink-600 hover:bg-pink-50"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="currentColor"
+                      >
+                        <path d="M7 2C4.243 2 2 4.243 2 7v10c0 2.757 2.243 5 5 5h10c2.757 0 5-2.243 5-5V7c0-2.757-2.243-5-5-5H7zm0 2h10c1.654 0 3 1.346 3 3v10c0 1.654-1.346 3-3 3H7c-1.654 0-3-1.346-3-3V7c0-1.654 1.346-3 3-3zm9 2a1 1 0 100 2 1 1 0 000-2zM12 7a5 5 0 100 10 5 5 0 000-10z" />
+                      </svg>
+                      @{m.instaId.replace(/^@/, "")}
+                    </a>
+                  )}
+                  {m.email && (
+                    <a
+                      href={`mailto:${m.email}`}
+                      className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-blue-600 hover:bg-blue-50"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="currentColor"
+                      >
+                        <path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 2l-8 5L4 6h16zm0 12H4V8l8 5 8-5v10z" />
+                      </svg>
+                      {m.email}
+                    </a>
+                  )}
+                  {m.contact && (
+                    <a
+                      href={`tel:${m.contact}`}
+                      className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-green-600 hover:bg-green-50"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="currentColor"
+                      >
+                        <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V21a1 1 0 01-1 1C10.42 22 2 13.58 2 3a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.46.57 3.58a1 1 0 01-.24 1.01l-2.2 2.2z" />
+                      </svg>
+                      {m.contact}
+                    </a>
+                  )}
                 </div>
               )}
             </div>
@@ -582,6 +640,39 @@ function StatCard({ value, label }: { value: string; label: string }) {
     <div className="rounded-xl border bg-card p-6 text-center shadow-sm">
       <div className="text-3xl font-extrabold text-primary">{value}</div>
       <div className="mt-1 text-sm text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function HeroSlideshow() {
+  const { data } = useQuery<GetGalleryResponse>({
+    queryKey: ["gallery-hero"],
+    queryFn: async () => apiGet("/api/gallery/featured", { images: [] }),
+  });
+  const imgs = data?.images || [];
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (imgs.length <= 1) return;
+    const id = setInterval(() => setIdx((i) => (i + 1) % imgs.length), 6000);
+    return () => clearInterval(id);
+  }, [imgs.length]);
+  const current =
+    imgs[idx]?.url ||
+    "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=60";
+  return (
+    <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-lg relative">
+      <AnimatePresence mode="wait">
+        <motion.img
+          key={current}
+          src={current}
+          alt="Gallery"
+          className="absolute inset-0 h-full w-full object-cover"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.9, ease: "easeInOut" }}
+        />
+      </AnimatePresence>
     </div>
   );
 }

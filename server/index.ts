@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
+import { fileURLToPath } from "url";
 import { handleDemo } from "./routes/demo";
 import galleryRouter from "./routes/gallery";
 import donorsRouter from "./routes/donors";
@@ -20,7 +21,8 @@ export function createServer() {
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
   // Static uploads (for local/dev). In production with Node, this serves uploaded files.
-  const uploadsPath = path.resolve(import.meta.dirname, "../public/uploads");
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const uploadsPath = path.resolve(__dirname, "../public/uploads");
   app.use("/uploads", express.static(uploadsPath));
 
   // Example API routes

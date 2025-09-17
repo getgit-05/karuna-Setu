@@ -19,6 +19,7 @@ const DonorSchema: Schema<IDonor> = new Schema(
       required: true,
     },
     logoUrl: { type: String },
+    logoPublicId: { type: String },
     website: { type: String },
     donatedAmount: { type: Number },
     donatedCommodity: { type: String },

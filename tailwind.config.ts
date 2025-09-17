@@ -1,6 +1,6 @@
 export default {
   darkMode: ["class"],
-  content: ["./client/**/*.{ts,tsx}"],
+  content: ["./client/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}", "./index.html"],
   prefix: "",
   theme: {
     container: {

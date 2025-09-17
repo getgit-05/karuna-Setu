@@ -14,10 +14,10 @@ export default function Admin() {
     localStorage.getItem("adminToken"),
   );
   const [email, setEmail] = useState<string>(
-    (import.meta as any).env.VITE_ADMIN_EMAIL
+    (import.meta as any).env.VITE_ADMIN_EMAIL || ""
   );
   const [password, setPassword] = useState<string>(
-    (import.meta as any).env.VITE_ADMIN_PASSWORD
+    (import.meta as any).env.VITE_ADMIN_PASSWORD || ""
   );
 
   const [activeTab, setActiveTab] = useState<"images" | "donors" | "members">(
@@ -81,6 +81,7 @@ export default function Admin() {
         body: fd,
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Upload failed");
       return (await res.json()) as { images: { title: string; url: string }[] };
     },
@@ -110,10 +111,34 @@ export default function Admin() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["gallery"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["gallery"] });
+      qc.invalidateQueries({ queryKey: ["gallery-hero"] });
+    },
+  });
+
+  const toggleFeaturedMutation = useMutation({
+    mutationFn: async ({ id, featured }: { id: string; featured: boolean }) => {
+      const res = await fetch(`/api/gallery/admin/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
+        },
+        body: JSON.stringify({ featured }),
+      });
+      if (res.status === 401) handleUnauthorized(res);
+      if (!res.ok) throw new Error("Failed");
+      return await res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["gallery"] });
+      qc.invalidateQueries({ queryKey: ["gallery-hero"] });
+    },
   });
 
   // Add donor (with optional logo file)
@@ -138,6 +163,7 @@ export default function Admin() {
         body: fd,
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return (await res.json()) as CreateDonorResponse;
     },
@@ -157,6 +183,7 @@ export default function Admin() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
@@ -188,6 +215,7 @@ export default function Admin() {
         body: fd,
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
@@ -206,6 +234,7 @@ export default function Admin() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token || ""}` },
       });
+      if (res.status === 401) handleUnauthorized(res);
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
@@ -352,15 +381,31 @@ export default function Admin() {
                       />
                       <div className="p-2 flex items-center justify-between">
                         <div className="text-sm">{img.title}</div>
-                        <button
-                          className="text-sm text-destructive"
-                          onClick={() =>
-                            img._id && deleteGalleryMutation.mutate(img._id)
-                          }
-                          disabled={isMutating(deleteGalleryMutation)}
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              checked={Boolean((img as any).featured)}
+                              onChange={(e) =>
+                                img._id &&
+                                toggleFeaturedMutation.mutate({
+                                  id: img._id,
+                                  featured: e.currentTarget.checked,
+                                })
+                              }
+                            />
+                            Feature on Home
+                          </label>
+                          <button
+                            className="text-sm text-destructive"
+                            onClick={() =>
+                              img._id && deleteGalleryMutation.mutate(img._id)
+                            }
+                            disabled={isMutating(deleteGalleryMutation)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -483,8 +528,14 @@ export default function Admin() {
               />
               <select name="role" className="rounded-md border px-3 py-2">
                 <option>Founder</option>
+                <option>Co-Founder</option>
                 <option>Partner</option>
+                <option>Co-Partner</option>
                 <option>Core</option>
+                <option>Technology</option>
+                <option>Developer</option>
+                <option>Volunteer</option>
+                <option>Advisor</option>
               </select>
               <input
                 id="member-photo"
