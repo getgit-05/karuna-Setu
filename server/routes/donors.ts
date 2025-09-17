@@ -5,7 +5,10 @@ import { requireAdminKey } from "../middleware/adminAuth";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import { v2 as cloudinary } from "cloudinary";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = Router();
 const upload = multer({
