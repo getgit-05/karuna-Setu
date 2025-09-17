@@ -2,8 +2,11 @@ import { RequestHandler, Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import { v2 as cloudinary } from "cloudinary";
 import { connectMongo } from "../db";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { ImageModel } from "../models/Image";
 import { requireAdminKey } from "../middleware/adminAuth";
 
