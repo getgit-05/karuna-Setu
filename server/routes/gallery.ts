@@ -136,7 +136,7 @@ router.delete("/admin/:id", requireAdminKey, (async (req, res) => {
         console.warn("Cloudinary delete failed", e);
       }
     } else if (img.url && (img.url as string).startsWith("/uploads/")) {
-      const uploadsRoot = path.resolve(import.meta.dirname, "../../public");
+      const uploadsRoot = path.resolve(__dirname, "../../public");
       const rel = (img.url as string).replace(/^\//, "");
       const filePath = path.join(uploadsRoot, rel);
       try {
