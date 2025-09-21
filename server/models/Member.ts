@@ -8,6 +8,7 @@ export interface IMember extends Document {
   instaId?: string;
   email?: string;
   contact?: string;
+  position: number;
   createdAt: Date;
 }
 
@@ -35,6 +36,7 @@ const MemberSchema: Schema<IMember> = new Schema(
     instaId: { type: String },
     email: { type: String },
     contact: { type: String },
+    position: { type: Number, default: 0 },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

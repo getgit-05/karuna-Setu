@@ -321,9 +321,9 @@ export default function Index() {
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {amt === 50
-                      ? "Feeds a child for a month"
+                      ? "Feeds a child for a day"
                       : amt === 500
-                        ? "School supplies for 5 kids"
+                        ? "School supplies for 2 kids"
                         : amt === 1000
                           ? "Medical care for a family"
                           : "Vaccination for 1 street dog"}

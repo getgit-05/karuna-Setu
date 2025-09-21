@@ -42,7 +42,7 @@ router.get("/", (async (_req, res) => {
   if (!connected) {
     return res.json({ donors: [] });
   }
-  const donors = await DonorModel.find().sort({ createdAt: -1 }).lean();
+  const donors = await DonorModel.find().sort({ position: 1 }).lean();
   res.json({ donors });
 }) as RequestHandler);
 
@@ -145,4 +145,30 @@ router.delete("/admin/:id", requireAdminKey, (async (req, res) => {
   }
 }) as RequestHandler);
 
+
+// POST /api/donors/admin/reorder - reorder donors
+router.post("/admin/reorder", requireAdminKey, (async (req, res) => {
+  const { orderedIds } = req.body as { orderedIds?: string[] };
+  if (!Array.isArray(orderedIds)) {
+    return res.status(400).json({ error: "orderedIds must be an array" });
+  }
+
+  const { connected } = await connectMongo();
+  if (!connected) {
+    return res.status(503).json({ error: "Database not configured" });
+  }
+
+  try {
+    const promises = orderedIds.map((id, index) =>
+      DonorModel.updateOne({ _id: id }, { $set: { position: index } })
+    );
+    await Promise.all(promises);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Failed to reorder donors" });
+  }
+}) as RequestHandler);
+
 export default router;
+

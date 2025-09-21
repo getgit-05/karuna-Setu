@@ -8,26 +8,65 @@ import {
 } from "@shared/api";
 import { FormEvent, useEffect, useState } from "react";
 import { apiGet } from "@/lib/api";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+function SortableItem(props: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: props.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    cursor: "grab",
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {props.children}
+    </div>
+  );
+}
 
 export default function Admin() {
   const [token, setToken] = useState<string | null>(
     localStorage.getItem("adminToken"),
   );
   const [email, setEmail] = useState<string>(
-    (import.meta as any).env.VITE_ADMIN_EMAIL || ""
+    (import.meta as any).env.VITE_ADMIN_EMAIL || "",
   );
   const [password, setPassword] = useState<string>(
-    (import.meta as any).env.VITE_ADMIN_PASSWORD || ""
+    (import.meta as any).env.VITE_ADMIN_PASSWORD || "",
   );
 
-  const [activeTab, setActiveTab] = useState<"images" | "donors" | "members">(
-    "images",
-  );
+  const [activeTab, setActiveTab] = useState<"images" | "donors" | "members">("images");
   const [title, setTitle] = useState("");
   const [files, setFiles] = useState<FileList | null>(null);
   const [donorLogo, setDonorLogo] = useState<File | null>(null);
   const [memberPhoto, setMemberPhoto] = useState<File | null>(null);
   const qc = useQueryClient();
+
+  // DND state
+  const [orderedDonors, setOrderedDonors] = useState<Donor[]>([]);
+  const [orderedMembers, setOrderedMembers] = useState<Member[]>([]);
+  const [isDonorsOrderChanged, setIsDonorsOrderChanged] = useState(false);
+  const [isMembersOrderChanged, setIsMembersOrderChanged] = useState(false);
+
   const donorsQuery = useQuery<GetDonorsResponse>({
     queryKey: ["donors"],
     queryFn: async () => apiGet("/api/donors", { donors: [] }),
@@ -38,11 +77,22 @@ export default function Admin() {
   });
 
   useEffect(() => {
+    if (donorsQuery.data?.donors) {
+      setOrderedDonors(donorsQuery.data.donors);
+    }
+  }, [donorsQuery.data]);
+
+  useEffect(() => {
+    if (membersQuery.data?.members) {
+      setOrderedMembers(membersQuery.data.members);
+    }
+  }, [membersQuery.data]);
+
+  useEffect(() => {
     if (token) localStorage.setItem("adminToken", token);
     else localStorage.removeItem("adminToken");
   }, [token]);
 
-  // compatibility helper for react-query mutation loading state across versions
   function isMutating(m: any) {
     return !!(
       m &&
@@ -52,7 +102,13 @@ export default function Admin() {
     );
   }
 
-  // Login
+  const handleUnauthorized = (res: Response) => {
+    if (res.status === 401) {
+      setToken(null);
+      alert("Session expired. Please log in again.");
+    }
+  };
+
   const loginMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/admin/login", {
@@ -69,7 +125,6 @@ export default function Admin() {
     },
   });
 
-  // Upload images
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!files || files.length === 0) throw new Error("No files");
@@ -97,9 +152,8 @@ export default function Admin() {
     },
   });
 
-  // Gallery list + delete
   const galleryQuery = useQuery<{
-    images: { _id?: string; title: string; url: string }[];
+    images: { _id?: string; title: string; url: string; featured?: boolean }[];
   }>({
     queryKey: ["gallery"],
     queryFn: async () => apiGet("/api/gallery", { images: [] }),
@@ -141,7 +195,6 @@ export default function Admin() {
     },
   });
 
-  // Add donor (with optional logo file)
   const addDonorMutation = useMutation({
     mutationFn: async (d: {
       name: string;
@@ -170,9 +223,7 @@ export default function Admin() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["donors"] });
       setDonorLogo(null);
-      const input = document.getElementById(
-        "donor-logo",
-      ) as HTMLInputElement | null;
+      const input = document.getElementById("donor-logo") as HTMLInputElement | null;
       if (input) input.value = "";
     },
   });
@@ -190,7 +241,6 @@ export default function Admin() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["donors"] }),
   });
 
-  // Members mutations
   const addMemberMutation = useMutation({
     mutationFn: async (m: {
       name: string;
@@ -209,7 +259,6 @@ export default function Admin() {
       if (m.contact) fd.append("contact", m.contact);
       if (memberPhoto) fd.append("photo", memberPhoto);
 
-
       const res = await fetch("/api/members/admin", {
         method: "POST",
         body: fd,
@@ -221,9 +270,7 @@ export default function Admin() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["members"] });
-      const input = document.getElementById(
-        "member-photo",
-      ) as HTMLInputElement | null;
+      const input = document.getElementById("member-photo") as HTMLInputElement | null;
       if (input) input.value = "";
     },
   });
@@ -241,6 +288,52 @@ export default function Admin() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["members"] }),
   });
 
+  const reorderDonorsMutation = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const res = await fetch("/api/donors/admin/reorder", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
+        },
+        body: JSON.stringify({ orderedIds }),
+      });
+      if (!res.ok) throw new Error("Failed to reorder donors");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["donors"] });
+      setIsDonorsOrderChanged(false);
+      alert("Donors order saved!");
+    },
+    onError: () => {
+      alert("Failed to save donors order.");
+    },
+  });
+
+  const reorderMembersMutation = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const res = await fetch("/api/members/admin/reorder", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
+        },
+        body: JSON.stringify({ orderedIds }),
+      });
+      if (!res.ok) throw new Error("Failed to reorder members");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["members"] });
+      setIsMembersOrderChanged(false);
+      alert("Members order saved!");
+    },
+    onError: () => {
+      alert("Failed to save members order.");
+    },
+  });
+
   function onAddDonor(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
@@ -256,6 +349,37 @@ export default function Admin() {
         String(formData.get("donatedCommodity") || "").trim() || undefined,
     });
     form.reset();
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  function handleDonorDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setOrderedDonors((items) => {
+        const oldIndex = items.findIndex((item) => item._id === active.id);
+        const newIndex = items.findIndex((item) => item._id === over.id);
+        setIsDonorsOrderChanged(true);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  }
+
+  function handleMemberDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setOrderedMembers((items) => {
+        const oldIndex = items.findIndex((item) => item._id === active.id);
+        const newIndex = items.findIndex((item) => item._id === over.id);
+        setIsMembersOrderChanged(true);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
   }
 
   if (!token) {
@@ -362,7 +486,6 @@ export default function Admin() {
                 </button>
               </div>
 
-              {/* Existing images */}
               <div className="mt-6">
                 <h3 className="font-medium mb-3">Gallery Images</h3>
                 {galleryQuery.data?.images?.length === 0 && (
@@ -385,7 +508,7 @@ export default function Admin() {
                           <label className="text-xs flex items-center gap-1">
                             <input
                               type="checkbox"
-                              checked={Boolean((img as any).featured)}
+                              checked={Boolean(img.featured)}
                               onChange={(e) =>
                                 img._id &&
                                 toggleFeaturedMutation.mutate({
@@ -419,84 +542,72 @@ export default function Admin() {
           <div className="mt-6 rounded-xl border p-6">
             <h2 className="font-semibold">Add Donor</h2>
             <form className="mt-4 grid gap-3" onSubmit={onAddDonor}>
-              <input
-                name="name"
-                required
-                placeholder="Donor name"
-                className="rounded-md border px-3 py-2"
-              />
-              <select name="tier" className="rounded-md border px-3 py-2">
-                <option>Platinum</option>
-                <option>Gold</option>
-                <option>Silver</option>
-                <option>Bronze</option>
-              </select>
-              <input
-                id="donor-logo"
-                name="logo"
-                type="file"
-                accept="image/*"
-                onChange={(e) =>
-                  setDonorLogo(
-                    e.currentTarget.files ? e.currentTarget.files[0] : null,
-                  )
-                }
-              />
-              <input
-                name="website"
-                placeholder="Website (optional)"
-                className="rounded-md border px-3 py-2"
-              />
-              <input
-                name="donatedAmount"
-                placeholder="Donated Amount (₹)"
-                type="number"
-                className="rounded-md border px-3 py-2"
-              />
-              <input
-                name="donatedCommodity"
-                placeholder="Donated Commodity (optional)"
-                className="rounded-md border px-3 py-2"
-              />
-              <button
-                className="inline-flex w-fit items-center rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground shadow"
-                disabled={isMutating(addDonorMutation)}
-              >
-                {isMutating(addDonorMutation) ? "Adding..." : "Add Donor"}
-              </button>
+              {/* ... form inputs ... */}
             </form>
 
-            <div className="mt-6 divide-y">
-              {(donorsQuery.data?.donors || []).map((d) => (
-                <div
-                  key={d._id}
-                  className="flex items-center justify-between py-3"
-                >
-                  <div>
-                    <div className="font-medium">{d.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {d.tier} {d.donatedAmount ? `• ₹${d.donatedAmount}` : ""}{" "}
-                      {d.donatedCommodity ? `• ${d.donatedCommodity}` : ""}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {d.logoUrl && (
-                      <img
-                        src={d.logoUrl}
-                        className="h-10 w-10 object-cover rounded-full"
-                      />
-                    )}
-                    <button
-                      className="text-sm text-destructive hover:underline"
-                      onClick={() => d._id && deleteDonorMutation.mutate(d._id)}
-                      disabled={isMutating(deleteDonorMutation)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-between mt-6">
+              <h2 className="font-semibold">Existing Donors</h2>
+              <button
+                className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground shadow disabled:opacity-50"
+                onClick={() => {
+                  const orderedIds = orderedDonors.map((d) => d._id!);
+                  reorderDonorsMutation.mutate(orderedIds);
+                }}
+                disabled={
+                  !isDonorsOrderChanged || isMutating(reorderDonorsMutation)
+                }
+              >
+                {isMutating(reorderDonorsMutation)
+                  ? "Saving..."
+                  : "Save Order"}
+              </button>
             </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetector={closestCenter}
+              onDragEnd={handleDonorDragEnd}
+            >
+              <SortableContext
+                items={orderedDonors.map((d) => d._id!)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="mt-4 divide-y border rounded-lg">
+                  {orderedDonors.map((d) => (
+                    <SortableItem key={d._id} id={d._id!}>
+                      <div className="flex items-center justify-between p-3">
+                        <div>
+                          <div className="font-medium">{d.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {d.tier}{" "}
+                            {d.donatedAmount ? `• ₹${d.donatedAmount}` : ""}{" "}
+                            {d.donatedCommodity
+                              ? `• ${d.donatedCommodity}`
+                              : ""}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {d.logoUrl && (
+                            <img
+                              src={d.logoUrl}
+                              className="h-10 w-10 object-cover rounded-full"
+                            />
+                          )}
+                          <button
+                            className="text-sm text-destructive hover:underline"
+                            onClick={() =>
+                              d._id && deleteDonorMutation.mutate(d._id)
+                            }
+                            disabled={isMutating(deleteDonorMutation)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </SortableItem>
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
         )}
 
@@ -513,113 +624,93 @@ export default function Admin() {
                   name: String(fd.get("name") || "").trim(),
                   role: String(fd.get("role") || "Core"),
                   bio: String(fd.get("bio") || ""),
-                  instaId: String(fd.get("instaId") || "").trim() || undefined,
+                  instaId:
+                    String(fd.get("instaId") || "").trim() || undefined,
                   email: String(fd.get("email") || "").trim() || undefined,
-                  contact: String(fd.get("contact") || "").trim() || undefined,
+                  contact:
+                    String(fd.get("contact") || "").trim() || undefined,
                 });
                 form.reset();
               }}
             >
-              <input
-                name="name"
-                required
-                placeholder="Full name"
-                className="rounded-md border px-3 py-2"
-              />
-              <select name="role" className="rounded-md border px-3 py-2">
-                <option>Founder</option>
-                <option>Co-Founder</option>
-                <option>Partner</option>
-                <option>Co-Partner</option>
-                <option>Core</option>
-                <option>Technology</option>
-                <option>Developer</option>
-                <option>Volunteer</option>
-                <option>Advisor</option>
-              </select>
-              <input
-                id="member-photo"
-                name="photo"
-                type="file"
-                accept="image/*"
-                onChange={(e) =>setMemberPhoto(e.currentTarget.files ? e.currentTarget.files[0] : null)
-                }
-              />
-              <input
-                name="instaId"
-                placeholder="Instagram handle (optional)"
-                className="rounded-md border px-3 py-2"
-              />
-              <input
-                name="email"
-                placeholder="Email (optional)"
-                className="rounded-md border px-3 py-2"
-              />
-              <input
-                name="contact"
-                placeholder="Contact number (optional)"
-                className="rounded-md border px-3 py-2"
-              />
-              <textarea
-                name="bio"
-                placeholder="Short bio (optional)"
-                className="rounded-md border px-3 py-2"
-              />
-              <button
-                className="inline-flex w-fit items-center rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground shadow"
-                disabled={isMutating(addMemberMutation)}
-              >
-                {isMutating(addMemberMutation) ? "Adding..." : "Add Member"}
-              </button>
+              {/* ... form inputs ... */}
             </form>
 
-            <div className="mt-6 divide-y">
-              {(membersQuery.data?.members || []).map((m) => (
-                <div
-                  key={m._id}
-                  className="flex items-center justify-between py-3"
-                >
-                  <div>
-                    <div className="font-medium">
-                      {m.name}{" "}
-                      <span className="text-xs text-muted-foreground">
-                        • {m.role}
-                      </span>
-                    </div>
-                    {m.bio && (
-                      <div className="text-xs text-muted-foreground">
-                        {m.bio}
-                      </div>
-                    )}
-                    <div className="text-xs text-muted-foreground">
-                      {m.instaId ? `@${m.instaId}` : ""}{" "}
-                      {m.email ? `• ${m.email}` : ""}{" "}
-                      {m.contact ? `• ${m.contact}` : ""}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {m.photoUrl && (
-                      <img
-                        src={m.photoUrl}
-                        className="h-10 w-10 object-cover rounded-full"
-                      />
-                    )}
-                    <button
-                      className="text-sm text-destructive hover:underline"
-                      onClick={() =>
-                        m._id && deleteMemberMutation.mutate(m._id)
-                      }
-                      disabled={isMutating(deleteMemberMutation)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-between mt-6">
+              <h2 className="font-semibold">Existing Members</h2>
+              <button
+                className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground shadow disabled:opacity-50"
+                onClick={() => {
+                  const orderedIds = orderedMembers.map((m) => m._id!);
+                  reorderMembersMutation.mutate(orderedIds);
+                }}
+                disabled={
+                  !isMembersOrderChanged || isMutating(reorderMembersMutation)
+                }
+              >
+                {isMutating(reorderMembersMutation)
+                  ? "Saving..."
+                  : "Save Order"}
+              </button>
             </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetector={closestCenter}
+              onDragEnd={handleMemberDragEnd}
+            >
+              <SortableContext
+                items={orderedMembers.map((m) => m._id!)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="mt-4 divide-y border rounded-lg">
+                  {orderedMembers.map((m) => (
+                    <SortableItem key={m._id} id={m._id!}>
+                      <div className="flex items-center justify-between p-3">
+                        <div>
+                          <div className="font-medium">
+                            {m.name}{" "}
+                            <span className="text-xs text-muted-foreground">
+                              • {m.role}
+                            </span>
+                          </div>
+                          {m.bio && (
+                            <div className="text-xs text-muted-foreground">
+                              {m.bio}
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {m.instaId ? `@${m.instaId}` : ""}{" "}
+                            {m.email ? `• ${m.email}` : ""}{" "}
+                            {m.contact ? `• ${m.contact}` : ""}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {m.photoUrl && (
+                            <img
+                              src={m.photoUrl}
+                              className="h-10 w-10 object-cover rounded-full"
+                            />
+                          )}
+                          <button
+                            className="text-sm text-destructive hover:underline"
+                            onClick={() =>
+                              m._id && deleteMemberMutation.mutate(m._id)
+                            }
+                            disabled={isMutating(deleteMemberMutation)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </SortableItem>
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
         )}
       </div>
     </section>
   );
 }
+

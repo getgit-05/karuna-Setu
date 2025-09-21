@@ -7,6 +7,7 @@ export interface IDonor extends Document {
   website?: string;
   donatedAmount?: number;
   donatedCommodity?: string;
+  position: number;
   createdAt: Date;
 }
 
@@ -23,6 +24,7 @@ const DonorSchema: Schema<IDonor> = new Schema(
     website: { type: String },
     donatedAmount: { type: Number },
     donatedCommodity: { type: String },
+    position: { type: Number, default: 0 },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

@@ -193,7 +193,7 @@ export default function Layout() {
           <div>
             <div className="font-semibold mb-2">Contact</div>
             <p className="text-sm text-muted-foreground">
-              Email: info@karunasetu.org
+              Email: foundationkarunasetu@gmail.com
             </p>
           </div>
         </div>
