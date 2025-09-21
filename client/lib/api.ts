@@ -34,3 +34,30 @@ export async function apiGet<T>(
     return fallback;
   }
 }
+
+export async function apiPost(url: string, data: any, timeout = 5000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+      signal: controller.signal,
+    });
+    clearTimeout(id);
+    return res;
+  } catch (err: any) {
+    if (err && err.name === "AbortError") {
+      console.warn(`apiPost ${url} aborted after ${timeout}ms`);
+    } else {
+      console.warn(
+        `apiPost ${url} failed: ${err?.message || err}`,
+        err?.stack ? undefined : err,
+      );
+    }
+    return new Response(null, { status: 500 });
+  }
+}
+

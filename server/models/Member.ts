@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IMember extends Document {
   name: string;
-  role: "Founder" | "Co-Founder" | "Partner" | "Co-Partner" | "Core" | "Technology" | "Developer" | "Volunteer" | "Advisor";
+  role: string;
   bio?: string;
   photoUrl?: string;
   instaId?: string;
@@ -15,21 +15,7 @@ export interface IMember extends Document {
 const MemberSchema: Schema<IMember> = new Schema(
   {
     name: { type: String, required: true },
-    role: {
-      type: String,
-      enum: [
-        "Founder",
-        "Co-Founder",
-        "Partner",
-        "Co-Partner",
-        "Core",
-        "Technology",
-        "Developer",
-        "Volunteer",
-        "Advisor",
-      ],
-      default: "Core",
-    },
+    role: { type: String },
     bio: { type: String },
     photoUrl: { type: String },
     photoPublicId: { type: String },

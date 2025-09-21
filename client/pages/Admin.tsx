@@ -66,6 +66,7 @@ export default function Admin() {
   const [orderedMembers, setOrderedMembers] = useState<Member[]>([]);
   const [isDonorsOrderChanged, setIsDonorsOrderChanged] = useState(false);
   const [isMembersOrderChanged, setIsMembersOrderChanged] = useState(false);
+  const [isDragMode, setIsDragMode] = useState(false);
 
   const donorsQuery = useQuery<GetDonorsResponse>({
     queryKey: ["donors"],
@@ -238,7 +239,13 @@ export default function Admin() {
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["donors"] }),
+    onSuccess: () => {
+      alert("Donor deleted successfully");
+    },
+    onError: (error) => {
+      alert(`Failed to delete donor: ${error.message}`);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["donors"] }),
   });
 
   const addMemberMutation = useMutation({
@@ -285,7 +292,13 @@ export default function Admin() {
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["members"] }),
+    onSuccess: () => {
+      alert("Member deleted successfully");
+    },
+    onError: (error) => {
+      alert(`Failed to delete member: ${error.message}`);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["members"] }),
   });
 
   const reorderDonorsMutation = useMutation({
@@ -304,6 +317,7 @@ export default function Admin() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["donors"] });
       setIsDonorsOrderChanged(false);
+      setIsDragMode(false);
       alert("Donors order saved!");
     },
     onError: () => {
@@ -327,6 +341,7 @@ export default function Admin() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["members"] });
       setIsMembersOrderChanged(false);
+      setIsDragMode(false);
       alert("Members order saved!");
     },
     onError: () => {
@@ -521,9 +536,10 @@ export default function Admin() {
                           </label>
                           <button
                             className="text-sm text-destructive"
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
                               img._id && deleteGalleryMutation.mutate(img._id)
-                            }
+                            }}
                             disabled={isMutating(deleteGalleryMutation)}
                           >
                             Delete
@@ -542,7 +558,24 @@ export default function Admin() {
           <div className="mt-6 rounded-xl border p-6">
             <h2 className="font-semibold">Add Donor</h2>
             <form className="mt-4 grid gap-3" onSubmit={onAddDonor}>
-              {/* ... form inputs ... */}
+              <input name="name" placeholder="Name" className="w-full rounded-md border px-3 py-2" required />
+              <select name="tier" defaultValue="Bronze" className="w-full rounded-md border px-3 py-2">
+                <option>Bronze</option>
+                <option>Silver</option>
+                <option>Gold</option>
+                <option>Platinum</option>
+              </select>
+              <input name="website" placeholder="Website URL" className="w-full rounded-md border px-3 py-2" />
+              <input name="donatedAmount" type="number" placeholder="Donated Amount" className="w-full rounded-md border px-3 py-2" />
+              <input name="donatedCommodity" placeholder="Donated Commodity" className="w-full rounded-md border px-3 py-2" />
+              <input id="donor-logo" type="file" accept="image/*" onChange={e => setDonorLogo(e.target.files ? e.target.files[0] : null)} />
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground shadow disabled:opacity-50"
+                disabled={isMutating(addDonorMutation)}
+              >
+                {isMutating(addDonorMutation) ? "Adding..." : "Add Donor"}
+              </button>
             </form>
 
             <div className="flex items-center justify-between mt-6">
@@ -550,64 +583,89 @@ export default function Admin() {
               <button
                 className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground shadow disabled:opacity-50"
                 onClick={() => {
-                  const orderedIds = orderedDonors.map((d) => d._id!);
-                  reorderDonorsMutation.mutate(orderedIds);
+                  if (isDragMode) {
+                    const orderedIds = orderedDonors.map((d) => d._id!);
+                    reorderDonorsMutation.mutate(orderedIds);
+                  } else {
+                    setIsDragMode(true);
+                  }
                 }}
-                disabled={
-                  !isDonorsOrderChanged || isMutating(reorderDonorsMutation)
-                }
+                disabled={isMutating(reorderDonorsMutation)}
               >
-                {isMutating(reorderDonorsMutation)
-                  ? "Saving..."
-                  : "Save Order"}
+                {isDragMode ? (isMutating(reorderDonorsMutation) ? "Saving..." : "Save Order") : "Change Order"}
               </button>
             </div>
-            <DndContext
-              sensors={sensors}
-              collisionDetector={closestCenter}
-              onDragEnd={handleDonorDragEnd}
-            >
-              <SortableContext
-                items={orderedDonors.map((d) => d._id!)}
-                strategy={verticalListSortingStrategy}
+            {isDragMode ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetector={closestCenter}
+                onDragEnd={handleDonorDragEnd}
               >
-                <div className="mt-4 divide-y border rounded-lg">
-                  {orderedDonors.map((d) => (
-                    <SortableItem key={d._id} id={d._id!}>
-                      <div className="flex items-center justify-between p-3">
-                        <div>
-                          <div className="font-medium">{d.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {d.tier}{" "}
-                            {d.donatedAmount ? `• ₹${d.donatedAmount}` : ""}{" "}
-                            {d.donatedCommodity
-                              ? `• ${d.donatedCommodity}`
-                              : ""}
+                <SortableContext
+                  items={orderedDonors.map((d) => d._id!)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="mt-4 divide-y border rounded-lg">
+                    {orderedDonors.map((d) => (
+                      <SortableItem key={d._id} id={d._id!}>
+                        <div className="flex items-center justify-between p-3">
+                          <div>
+                            <div className="font-medium">{d.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {d.tier}{" "}
+                              {d.donatedAmount ? `• ₹${d.donatedAmount}` : ""}{" "}
+                              {d.donatedCommodity
+                                ? `• ${d.donatedCommodity}`
+                                : ""}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3">
                           {d.logoUrl && (
                             <img
                               src={d.logoUrl}
                               className="h-10 w-10 object-cover rounded-full"
                             />
                           )}
-                          <button
-                            className="text-sm text-destructive hover:underline"
-                            onClick={() =>
-                              d._id && deleteDonorMutation.mutate(d._id)
-                            }
-                            disabled={isMutating(deleteDonorMutation)}
-                          >
-                            Delete
-                          </button>
                         </div>
+                      </SortableItem>
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <div className="mt-4 divide-y border rounded-lg">
+                {orderedDonors.map((d) => (
+                  <div key={d._id} className="flex items-center justify-between p-3">
+                    <div>
+                      <div className="font-medium">{d.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {d.tier}{" "}
+                        {d.donatedAmount ? `• ₹${d.donatedAmount}` : ""}{" "}
+                        {d.donatedCommodity
+                          ? `• ${d.donatedCommodity}`
+                          : ""}
                       </div>
-                    </SortableItem>
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {d.logoUrl && (
+                        <img
+                          src={d.logoUrl}
+                          className="h-10 w-10 object-cover rounded-full"
+                        />
+                      )}
+                      <button
+                        className="text-sm text-destructive hover:underline"
+                        onClick={() => {
+                          d._id && deleteDonorMutation.mutate(d._id)
+                        }}
+                        disabled={isMutating(deleteDonorMutation)}
+                      >
+                        {isMutating(deleteDonorMutation) ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -622,7 +680,7 @@ export default function Admin() {
                 const fd = new FormData(form);
                 addMemberMutation.mutate({
                   name: String(fd.get("name") || "").trim(),
-                  role: String(fd.get("role") || "Core"),
+                  role: String(fd.get("role") || ""),
                   bio: String(fd.get("bio") || ""),
                   instaId:
                     String(fd.get("instaId") || "").trim() || undefined,
@@ -633,7 +691,20 @@ export default function Admin() {
                 form.reset();
               }}
             >
-              {/* ... form inputs ... */}
+              <input name="name" placeholder="Name" className="w-full rounded-md border px-3 py-2" required />
+              <input name="role" placeholder="Role" className="w-full rounded-md border px-3 py-2" />
+              <input name="bio" placeholder="Bio" className="w-full rounded-md border px-3 py-2" />
+              <input name="instaId" placeholder="Instagram ID" className="w-full rounded-md border px-3 py-2" />
+              <input name="email" placeholder="Email" className="w-full rounded-md border px-3 py-2" />
+              <input name="contact" placeholder="Contact" className="w-full rounded-md border px-3 py-2" />
+              <input id="member-photo" type="file" accept="image/*" onChange={e => setMemberPhoto(e.target.files ? e.target.files[0] : null)} />
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground shadow disabled:opacity-50"
+                disabled={isMutating(addMemberMutation)}
+              >
+                {isMutating(addMemberMutation) ? "Adding..." : "Add Member"}
+              </button>
             </form>
 
             <div className="flex items-center justify-between mt-6">
@@ -641,76 +712,108 @@ export default function Admin() {
               <button
                 className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground shadow disabled:opacity-50"
                 onClick={() => {
-                  const orderedIds = orderedMembers.map((m) => m._id!);
-                  reorderMembersMutation.mutate(orderedIds);
+                  if (isDragMode) {
+                    const orderedIds = orderedMembers.map((m) => m._id!);
+                    reorderMembersMutation.mutate(orderedIds);
+                  } else {
+                    setIsDragMode(true);
+                  }
                 }}
-                disabled={
-                  !isMembersOrderChanged || isMutating(reorderMembersMutation)
-                }
+                disabled={isMutating(reorderMembersMutation)}
               >
-                {isMutating(reorderMembersMutation)
-                  ? "Saving..."
-                  : "Save Order"}
+                {isDragMode ? (isMutating(reorderMembersMutation) ? "Saving..." : "Save Order") : "Change Order"}
               </button>
             </div>
-            <DndContext
-              sensors={sensors}
-              collisionDetector={closestCenter}
-              onDragEnd={handleMemberDragEnd}
-            >
-              <SortableContext
-                items={orderedMembers.map((m) => m._id!)}
-                strategy={verticalListSortingStrategy}
+            {isDragMode ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetector={closestCenter}
+                onDragEnd={handleMemberDragEnd}
               >
-                <div className="mt-4 divide-y border rounded-lg">
-                  {orderedMembers.map((m) => (
-                    <SortableItem key={m._id} id={m._id!}>
-                      <div className="flex items-center justify-between p-3">
-                        <div>
-                          <div className="font-medium">
-                            {m.name}{" "}
-                            <span className="text-xs text-muted-foreground">
-                              • {m.role}
-                            </span>
-                          </div>
-                          {m.bio && (
-                            <div className="text-xs text-muted-foreground">
-                              {m.bio}
+                <SortableContext
+                  items={orderedMembers.map((m) => m._id!)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="mt-4 divide-y border rounded-lg">
+                    {orderedMembers.map((m) => (
+                      <SortableItem key={m._id} id={m._id!}>
+                        <div className="flex items-center justify-between p-3">
+                          <div>
+                            <div className="font-medium">
+                              {m.name}{" "}
+                              <span className="text-xs text-muted-foreground">
+                                • {m.role}
+                              </span>
                             </div>
-                          )}
-                          <div className="text-xs text-muted-foreground">
-                            {m.instaId ? `@${m.instaId}` : ""}{" "}
-                            {m.email ? `• ${m.email}` : ""}{" "}
-                            {m.contact ? `• ${m.contact}` : ""}
+                            {m.bio && (
+                              <div className="text-xs text-muted-foreground">
+                                {m.bio}
+                              </div>
+                            )}
+                            <div className="text-xs text-muted-foreground">
+                              {m.instaId ? `@${m.instaId}` : ""}{" "}
+                              {m.email ? `• ${m.email}` : ""}{" "}
+                              {m.contact ? `• ${m.contact}` : ""}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3">
                           {m.photoUrl && (
                             <img
                               src={m.photoUrl}
                               className="h-10 w-10 object-cover rounded-full"
                             />
                           )}
-                          <button
-                            className="text-sm text-destructive hover:underline"
-                            onClick={() =>
-                              m._id && deleteMemberMutation.mutate(m._id)
-                            }
-                            disabled={isMutating(deleteMemberMutation)}
-                          >
-                            Delete
-                          </button>
                         </div>
+                      </SortableItem>
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <div className="mt-4 divide-y border rounded-lg">
+                {orderedMembers.map((m) => (
+                  <div key={m._id} className="flex items-center justify-between p-3">
+                    <div>
+                      <div className="font-medium">
+                        {m.name}{" "}
+                        <span className="text-xs text-muted-foreground">
+                          • {m.role}
+                        </span>
                       </div>
-                    </SortableItem>
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+                      {m.bio && (
+                        <div className="text-xs text-muted-foreground">
+                          {m.bio}
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground">
+                        {m.instaId ? `@${m.instaId}` : ""}{" "}
+                        {m.email ? `• ${m.email}` : ""}{" "}
+                        {m.contact ? `• ${m.contact}` : ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {m.photoUrl && (
+                        <img
+                          src={m.photoUrl}
+                          className="h-10 w-10 object-cover rounded-full"
+                        />
+                      )}
+                      <button
+                        className="text-sm text-destructive hover:underline"
+                        onClick={() => {
+                          m._id && deleteMemberMutation.mutate(m._id)
+                        }}
+                        disabled={isMutating(deleteMemberMutation)}
+                      >
+                        {isMutating(deleteMemberMutation) ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
     </section>
   );
 }
-
